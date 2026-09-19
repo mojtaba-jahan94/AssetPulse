@@ -106,10 +106,19 @@ export class PortfolioCalculator {
           realizedPnLUsd += sellProceedsUsd - costBasisUsd;
 
           currentQty = Math.max(0, currentQty - tx.quantity);
+          if (currentQty <= 0.000001) {
+            currentQty = 0;
+            wacToman = 0;
+            wacUsd = 0;
+          }
         }
       }
 
-      // If user holds any balance (or had realized PnL)
+      // Always accumulate realized PnL even if position is completely closed
+      totalRealizedPnLToman += realizedPnLToman;
+      totalRealizedPnLUsd += realizedPnLUsd;
+
+      // If user holds any active balance, add to holdings list
       if (currentQty > 0.000001) {
         const latest = pricesMap.get(asset.id);
         const curPriceToman = latest?.price_toman || wacToman;
@@ -125,8 +134,6 @@ export class PortfolioCalculator {
 
         totalPortfolioValueToman += curValueToman;
         totalInvestedToman += investedToman;
-        totalRealizedPnLToman += realizedPnLToman;
-        totalRealizedPnLUsd += realizedPnLUsd;
 
         holdings.push({
           asset,

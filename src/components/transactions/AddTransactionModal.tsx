@@ -30,15 +30,19 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
   preselectedAssetId,
   onSubmit,
 }) => {
+  const getLocalDateTimeLocal = () => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  };
+
   const [type, setType] = useState<'buy' | 'sell'>('buy');
   const [assetId, setAssetId] = useState(preselectedAssetId || (assets[0]?.id ?? ''));
   const [quantity, setQuantity] = useState('');
   const [unitPrice, setUnitPrice] = useState('');
   const [currency, setCurrency] = useState<'toman' | 'usd'>('toman');
   const [fee, setFee] = useState('');
-  const [transactionDate, setTransactionDate] = useState(
-    new Date().toISOString().slice(0, 16)
-  );
+  const [transactionDate, setTransactionDate] = useState(getLocalDateTimeLocal());
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

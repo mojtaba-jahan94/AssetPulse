@@ -157,6 +157,30 @@ export async function runPortfolioCalculatorTests(): Promise<{ suite: string; pa
     assert.strictEqual(summary.total_value_usd, 1000, 'Total USD value should be 1000');
     console.log('✓ Test 5 Passed: Dual currency conversion (Toman & USD) accurate');
     passed++;
+
+    // Test 6: Complete Liquidation (Sell Remaining 2 Coins)
+    // Selling 2 remaining coins at 54,000,000 each, 0 fee
+    // Cost basis = 2 * 42,033,333 = 84,066,666
+    // Additional Realized PnL = 108M - 84,066,666 = 23,933,334
+    // Cumulative Realized PnL = 9,916,667 + 23,933,334 = 33,850,001
+    testDb.addTransaction({
+      id: 'tx_test_4',
+      asset_id: 'gold_emami',
+      type: 'sell',
+      quantity: 2,
+      unit_price: 54000000,
+      currency: 'toman',
+      fee: 0,
+      fee_currency: 'toman',
+      transaction_date: '2024-01-04T10:00:00Z'
+    });
+
+    summary = calc.calculatePortfolio();
+    assert.strictEqual(summary.holdings.length, 0, 'Holdings should be 0 after full liquidation');
+    assert.strictEqual(summary.total_value_toman, 0, 'Portfolio value should be 0');
+    assert.strictEqual(summary.realized_pnl_toman, 33850000, 'Cumulative Realized PnL preserved after full liquidation');
+    console.log('✓ Test 6 Passed: Complete liquidation properly preserves cumulative realized PnL');
+    passed++;
   } catch (err: any) {
     console.error('✗ PortfolioCalculator Test Failure:', err.message);
     failed++;

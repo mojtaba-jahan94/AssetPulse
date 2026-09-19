@@ -116,7 +116,7 @@ export class TgjuPriceAdapter implements IPriceAdapter {
     if (current['price_dollar_rl']?.p) {
       const raw = parseFloat(String(current['price_dollar_rl'].p).replace(/,/g, ''));
       if (!isNaN(raw) && raw > 0) {
-        usdPriceToman = raw > 1000000 ? raw / 10 : raw; // Convert Rials to Toman
+        usdPriceToman = raw > 200000 ? Math.round(raw / 10) : Math.round(raw); // Convert Rials to Toman
       }
     }
 
@@ -127,7 +127,7 @@ export class TgjuPriceAdapter implements IPriceAdapter {
         const item = current[tgjuKey];
         const rawPrice = parseFloat(String(item.p || item.price || 0).replace(/,/g, ''));
         // TGJU prices are in Rials; convert to Toman
-        const priceToman = rawPrice > 1000000 ? Math.round(rawPrice / 10) : rawPrice;
+        const priceToman = rawPrice > 200000 ? Math.round(rawPrice / 10) : Math.round(rawPrice);
         const priceUsd = usdPriceToman > 0 ? Number((priceToman / usdPriceToman).toFixed(4)) : 0;
         const changePercent = parseFloat(String(item.dp || item.d || 0).replace(/%/g, '')) || 0;
 
@@ -137,8 +137,8 @@ export class TgjuPriceAdapter implements IPriceAdapter {
           price_toman: priceToman,
           price_usd: priceUsd,
           change_24h: changePercent,
-          high_24h: item.h ? parseFloat(String(item.h).replace(/,/g, '')) / 10 : priceToman * 1.01,
-          low_24h: item.l ? parseFloat(String(item.l).replace(/,/g, '')) / 10 : priceToman * 0.99,
+          high_24h: item.h ? Math.round(parseFloat(String(item.h).replace(/,/g, '')) / 10) : Math.round(priceToman * 1.01),
+          low_24h: item.l ? Math.round(parseFloat(String(item.l).replace(/,/g, '')) / 10) : Math.round(priceToman * 0.99),
           source: this.id,
           timestamp
         });
@@ -163,7 +163,7 @@ export class TgjuPriceAdapter implements IPriceAdapter {
       if (!isNaN(rawPrice) && rawPrice > 0) {
         const asset = assets.find((a) => a.symbol.toLowerCase() === symbolAttr.toLowerCase() || symbolAttr.includes(a.symbol.toLowerCase()));
         if (asset) {
-          const priceToman = rawPrice > 1000000 ? Math.round(rawPrice / 10) : rawPrice;
+          const priceToman = rawPrice > 200000 ? Math.round(rawPrice / 10) : Math.round(rawPrice);
           quotes.push({
             symbol: asset.symbol,
             asset_id: asset.id,
