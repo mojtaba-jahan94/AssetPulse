@@ -44,8 +44,10 @@ if (fs.existsSync(distPath)) {
 }
 
 
-const server = app.listen(PORT, () => {
-  console.log(`[AssetPulse Engine] Server running on http://localhost:${PORT}`);
+const HOST = '0.0.0.0';
+const server = app.listen(PORT, HOST, () => {
+  console.log(`[AssetPulse Engine] Local:   http://localhost:${PORT}`);
+  console.log(`[AssetPulse Engine] Network: http://192.168.1.101:${PORT} (Use this on your phone!)`);
   console.log(`[AssetPulse Engine] SQLite database active with zero-latency local caching.`);
   console.log(`[AssetPulse Engine] Price ingestion active source: ${priceManager.getActiveSource()}`);
 });
