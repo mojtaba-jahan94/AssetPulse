@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LiquidGlass Vanilla Example</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #000; color: #fff; }
+    
+    #scene {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .bg-mesh {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 30%, #ec4899, #8b5cf6, #3b82f6);
+      filter: blur(40px);
+      transform: scale(1.1);
+    }
+    
+    .bg-content {
+      position: absolute;
+      text-align: center;
+      pointer-events: none;
+    }
+    .bg-content h1 { font-size: 5rem; font-weight: 800; letter-spacing: -2px; }
+    .bg-content p { font-size: 1.5rem; opacity: 0.8; margin-top: 10px; }
+    
+    .glass-panel {
+      position: absolute;
+      width: 440px;
+      height: 260px;
+      padding: 32px;
+      border-radius: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      user-select: none;
+    }
+    
+    .glass-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.2);
+      font-size: 0.85rem;
+      font-weight: 600;
+      width: fit-content;
+    }
+    
+    .glass-panel h2 { font-size: 1.8rem; font-weight: 700; }
+    .glass-panel p { font-size: 1rem; opacity: 0.9; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div id="scene">
+    <div class="bg-mesh"></div>
+    <div class="bg-content">
+      <h1>WebGL Liquid Glass</h1>
+      <p>Photorealistic optical refraction & blur</p>
+    </div>
+
+    <div class="glass-panel" id="floatingGlass">
+      <div class="glass-badge">Draggable Lens</div>
+      <div>
+        <h2>Liquid Glass Panel</h2>
+        <p>Drag me across the colored background to view real-time WebGL refraction and chromatic dispersion.</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { LiquidGlass } from 'https://cdn.jsdelivr.net/npm/@ybouane/liquidglass/dist/index.js';
+
+    const panel = document.getElementById('floatingGlass');
+    panel.dataset.config = JSON.stringify({
+      blurAmount: 0.15,
+      refraction: 0.85,
+      chromAberration: 0.08,
+      edgeHighlight: 0.18,
+      specular: 0.12,
+      fresnel: 1.1,
+      cornerRadius: 40,
+      zRadius: 32,
+      floating: true
+    });
+
+    const instance = await LiquidGlass.init({
+      root: document.getElementById('scene'),
+      glassElements: [panel]
+    });
+  </script>
+</body>
+</html>
