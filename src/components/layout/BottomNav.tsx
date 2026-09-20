@@ -10,14 +10,14 @@ interface BottomNavProps {
 
 export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab }) => {
   const navItems = [
-    { id: 'dashboard' as TabType, label: 'Overview', icon: LayoutDashboard },
-    { id: 'assets' as TabType, label: 'Holdings', icon: Coins },
-    { id: 'transactions' as TabType, label: 'Activity', icon: History },
-    { id: 'settings' as TabType, label: 'Pipeline', icon: Settings },
+    { id: 'dashboard' as TabType, label: 'داشبورد', icon: LayoutDashboard },
+    { id: 'assets' as TabType, label: 'دارایی‌ها', icon: Coins },
+    { id: 'transactions' as TabType, label: 'تراکنش‌ها', icon: History },
+    { id: 'settings' as TabType, label: 'تنظیمات', icon: Settings },
   ];
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-dark-950/90 backdrop-blur-xl border-t border-white/10 px-2 py-2 flex items-center justify-around">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-dark-950/95 backdrop-blur-xl border-t border-white/10 px-2 py-2 flex items-center justify-around transition-colors duration-300">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = currentTab === item.id;
@@ -31,7 +31,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab })
             )}
           >
             <Icon size={20} className={isActive ? 'text-amber-400' : 'text-slate-400'} />
-            <span className="text-[10px] mt-1">{item.label}</span>
+            <span className="text-[10px] mt-1 font-medium">{item.label}</span>
           </button>
         );
       })}

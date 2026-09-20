@@ -128,6 +128,33 @@ export class DatabaseService {
     );
   }
 
+  public getTransactionById(id: string): Transaction | null {
+    const stmt = this.db.prepare('SELECT * FROM transactions WHERE id = ?');
+    const res = stmt.get(id);
+    return (res as unknown as Transaction) || null;
+  }
+
+  public updateTransaction(tx: Transaction): boolean {
+    const stmt = this.db.prepare(`
+      UPDATE transactions
+      SET asset_id = ?, type = ?, quantity = ?, unit_price = ?, currency = ?, fee = ?, fee_currency = ?, transaction_date = ?, notes = ?
+      WHERE id = ?
+    `);
+    const res = stmt.run(
+      tx.asset_id,
+      tx.type,
+      tx.quantity,
+      tx.unit_price,
+      tx.currency,
+      tx.fee || 0,
+      tx.fee_currency || tx.currency,
+      tx.transaction_date,
+      tx.notes || '',
+      tx.id
+    );
+    return (res as any)?.changes > 0;
+  }
+
   public deleteTransaction(id: string): boolean {
     const stmt = this.db.prepare('DELETE FROM transactions WHERE id = ?');
     const res = stmt.run(id);

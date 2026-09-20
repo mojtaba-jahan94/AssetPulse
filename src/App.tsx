@@ -8,9 +8,10 @@ import { QuickStats } from './components/dashboard/QuickStats';
 import { AllocationChart } from './components/dashboard/AllocationChart';
 import { PerformanceChart } from './components/dashboard/PerformanceChart';
 import { AssetList } from './components/assets/AssetList';
-import { TransactionHistory } from './components/transactions/TransactionHistory';
+import { TransactionHistory, TxWithAsset } from './components/transactions/TransactionHistory';
 import { AddTransactionModal } from './components/transactions/AddTransactionModal';
 import { SettingsModal } from './components/settings/SettingsModal';
+import { InstallPromptModal } from './components/common/InstallPromptModal';
 
 import {
   fetchPortfolioSummary,
@@ -21,12 +22,14 @@ import {
   fetchPriceStatus,
   refreshPrices,
   createTransaction,
+  updateTransaction,
   deleteTransaction
 } from './services/api';
 
 import { PortfolioSummary, CategoryAllocation, HistoricalPerformancePoint } from './types/portfolio';
 import { Asset, Transaction, LatestPrice } from './types/database';
 import { IngestionStatus } from './types/prices';
+import { Smartphone, Palette, Settings as SettingsIcon } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabType>('dashboard');
@@ -40,20 +43,33 @@ export const App: React.FC = () => {
   const [summary, setSummary] = useState<(PortfolioSummary & { allocations: CategoryAllocation[] }) | null>(null);
   const [performance, setPerformance] = useState<HistoricalPerformancePoint[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [transactions, setTransactions] = useState<(Transaction & { symbol: string; name_en: string; name_fa: string; category: string })[]>([]);
+  const [transactions, setTransactions] = useState<TxWithAsset[]>([]);
   const [latestPrices, setLatestPrices] = useState<(LatestPrice & { symbol: string; name_en: string; name_fa: string; category: string })[]>([]);
   const [priceStatus, setPriceStatus] = useState<IngestionStatus | null>(null);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAddTxOpen, setIsAddTxOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState<TxWithAsset | null>(null);
   const [preselectedAssetId, setPreselectedAssetId] = useState<string | undefined>(undefined);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  // PWA Install Prompt Listener
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
 
   const loadAllData = useCallback(async () => {
     try {
@@ -98,37 +114,59 @@ export const App: React.FC = () => {
     try {
       const res = await refreshPrices();
       if (res.success) {
-        showToast(`Market prices updated via ${res.data?.quotesCount || 0} quotes!`);
+        showToast(`قیمت‌ها با ${res.data?.quotesCount || 0} داده جدید به‌روز شدند!`);
       } else {
-        showToast('Updated with resilient cache fallback', 'success');
+        showToast('قیمت‌ها با کش انعطاف‌پذیر به‌روزرسانی شدند', 'success');
       }
       await loadAllData();
     } catch (err: any) {
-      showToast(err.message || 'Refresh failed', 'error');
+      showToast(err.message || 'خطا در دریافت نرخ‌های جدید', 'error');
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  const handleAddTransactionSubmit = async (txData: any) => {
-    await createTransaction(txData);
-    showToast('Transaction successfully recorded!');
-    await loadAllData();
+  const handleTransactionSubmit = async (txData: any) => {
+    try {
+      if (txData.id) {
+        await updateTransaction(txData.id, txData);
+        showToast('تراکنش با موفقیت ویرایش و در پورتفوی اعمال شد!');
+      } else {
+        await createTransaction(txData);
+        showToast('تراکنش جدید با موفقیت ثبت شد!');
+      }
+      setEditingTx(null);
+      setIsAddTxOpen(false);
+      await loadAllData();
+    } catch (err: any) {
+      showToast(err.message || 'خطا در ثبت یا ویرایش تراکنش', 'error');
+    }
+  };
+
+  const handleOpenEditTransaction = (tx: TxWithAsset) => {
+    setEditingTx(tx);
+    setPreselectedAssetId(tx.asset_id);
+    setIsAddTxOpen(true);
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    await deleteTransaction(id);
-    showToast('Transaction removed.');
-    await loadAllData();
+    try {
+      await deleteTransaction(id);
+      showToast('تراکنش با موفقیت حذف شد و محاسبات پورتفوی به‌روز شد.');
+      await loadAllData();
+    } catch (err: any) {
+      showToast(err.message || 'خطا در حذف تراکنش', 'error');
+    }
   };
 
   const handleOpenAddForAsset = (assetId: string) => {
+    setEditingTx(null);
     setPreselectedAssetId(assetId);
     setIsAddTxOpen(true);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-dark-950 text-slate-100 selection:bg-amber-500 selection:text-dark-950">
+    <div className="min-h-screen flex flex-col bg-dark-950 text-slate-100 selection:bg-amber-500 selection:text-dark-950 transition-colors duration-300">
       {/* Toast Notification */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -154,10 +192,12 @@ export const App: React.FC = () => {
         onRefreshPrices={handleManualRefreshPrices}
         isRefreshing={isRefreshing}
         onOpenAddTransaction={() => {
+          setEditingTx(null);
           setPreselectedAssetId(undefined);
           setIsAddTxOpen(true);
         }}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenInstallModal={() => setIsInstallModalOpen(true)}
       />
 
       {/* Rolling Price Ticker */}
@@ -210,13 +250,13 @@ export const App: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <h3 className="text-base font-bold text-white tracking-tight">
-                        Core Asset Holdings
+                        دارایی‌های سبد سرمایه‌گذاری (Core Asset Holdings)
                       </h3>
                       <button
                         onClick={() => setCurrentTab('assets')}
                         className="text-xs text-amber-400 hover:text-amber-300 font-semibold transition-colors"
                       >
-                        View All Assets →
+                        مشاهده همه دارایی‌ها ←
                       </button>
                     </div>
 
@@ -233,9 +273,9 @@ export const App: React.FC = () => {
               {currentTab === 'assets' && (
                 <div className="space-y-6 animate-in fade-in duration-300">
                   <div>
-                    <h2 className="text-xl font-bold text-white">Asset Inventory & Valuations</h2>
+                    <h2 className="text-xl font-bold text-white">فهرست و ارزش‌گذاری دارایی‌ها</h2>
                     <p className="text-xs text-slate-400 mt-1">
-                      Real-time positions across Gold, Coins, Currencies, and Cryptocurrencies.
+                      موقعیت لحظه‌ای و سود و زیان تجمیعی در طلا، سکه، ارزهای جهانی و رمزارزها.
                     </p>
                   </div>
                   <AssetList
@@ -249,16 +289,31 @@ export const App: React.FC = () => {
 
               {currentTab === 'transactions' && (
                 <div className="space-y-6 animate-in fade-in duration-300">
-                  <div>
-                    <h2 className="text-xl font-bold text-white">Transaction Ledger</h2>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Offline-first audit record of all buys, sells, fees, and timestamps.
-                    </p>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">دفتر کل تراکنش‌ها (Ledger)</h2>
+                      <p className="text-xs text-slate-400 mt-1">
+                        امکان ثبت، جستجو، ویرایش جزئیات و حذف قطعی تمام معاملات خرید و فروش.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setEditingTx(null);
+                        setPreselectedAssetId(undefined);
+                        setIsAddTxOpen(true);
+                      }}
+                      className="self-start sm:self-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-dark-950 font-bold text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+                    >
+                      + ثبت تراکنش جدید
+                    </button>
                   </div>
+
                   <TransactionHistory
                     transactions={transactions}
                     baseCurrency={baseCurrency}
                     privacyMode={privacyMode}
+                    onEditTransaction={handleOpenEditTransaction}
                     onDeleteTransaction={handleDeleteTransaction}
                   />
                 </div>
@@ -267,22 +322,50 @@ export const App: React.FC = () => {
               {currentTab === 'settings' && (
                 <div className="space-y-6 animate-in fade-in duration-300">
                   <div>
-                    <h2 className="text-xl font-bold text-white">Price Ingestion Engine & System Config</h2>
+                    <h2 className="text-xl font-bold text-white">تنظیمات، شخصی‌سازی ظاهر و وب‌اپلیکیشن</h2>
                     <p className="text-xs text-slate-400 mt-1">
-                      Configure your active scraping adapter, scheduled intervals, and inspect diagnostics.
+                      پیکربندی رنگ‌های شاخص، تم OLED و مشکی عمیق، منابع قیمت و نصب روی گوشی.
                     </p>
                   </div>
 
-                  <div className="p-6 rounded-3xl glass-panel space-y-4">
-                    <p className="text-xs text-slate-300">
-                      Manage price sources directly via the interactive controller modal:
-                    </p>
-                    <button
-                      onClick={() => setIsSettingsOpen(true)}
-                      className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-dark-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all"
-                    >
-                      Open Pipeline Controller
-                    </button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Appearance & Themes card */}
+                    <div className="p-6 rounded-3xl glass-panel space-y-4">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="p-2 rounded-xl bg-amber-500/15 text-amber-400">
+                          <Palette size={20} />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-white text-sm">شخصی‌سازی ظاهر و رنگ‌ها</h3>
+                          <p className="text-[11px] text-slate-400">انتخاب پالت رنگ، تم تاریک OLED، شدت شیشه‌ای و چیدمان فشرده</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-dark-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all"
+                      >
+                        تنظیم تم و رنگ‌بندی رابط کاربری
+                      </button>
+                    </div>
+
+                    {/* Mobile PWA Install Card */}
+                    <div className="p-6 rounded-3xl glass-panel space-y-4">
+                      <div className="flex items-center space-x-2.5">
+                        <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-400">
+                          <Smartphone size={20} />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-white text-sm">نصب وب‌اپلیکیشن روی گوشی (PWA)</h3>
+                          <p className="text-[11px] text-slate-400">نصب مستقیم روی صفحه اصلی آیفون و اندروید بدون نوار مرورگر</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setIsInstallModalOpen(true)}
+                        className="w-full py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-white font-bold text-xs transition-all"
+                      >
+                        راهنما و نصب روی موبایل
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -290,7 +373,7 @@ export const App: React.FC = () => {
           ) : (
             <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4 text-slate-400 text-sm">
               <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-              <p>Connecting to AssetPulse Engine & SQLite Local Cache...</p>
+              <p>در حال بارگذاری اطلاعات دارایی‌ها و موتور AssetPulse...</p>
             </div>
           )}
         </main>
@@ -299,22 +382,37 @@ export const App: React.FC = () => {
       {/* Mobile Bottom Navigation */}
       <BottomNav currentTab={currentTab} onSelectTab={setCurrentTab} />
 
-      {/* Add Transaction Modal */}
+      {/* Add / Edit Transaction Modal */}
       <AddTransactionModal
         isOpen={isAddTxOpen}
-        onClose={() => setIsAddTxOpen(false)}
+        onClose={() => {
+          setIsAddTxOpen(false);
+          setEditingTx(null);
+        }}
         assets={assets}
         latestPrices={latestPrices}
         preselectedAssetId={preselectedAssetId}
-        onSubmit={handleAddTransactionSubmit}
+        initialTransaction={editingTx}
+        onSubmit={handleTransactionSubmit}
       />
 
-      {/* Settings Modal */}
+      {/* Settings & UI Customization Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         status={priceStatus}
         onStatusChange={(newStatus) => setPriceStatus(newStatus)}
+        onOpenInstallModal={() => setIsInstallModalOpen(true)}
+      />
+
+      {/* PWA Mobile Install Modal */}
+      <InstallPromptModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        deferredPrompt={deferredPrompt}
+        onInstalled={() => {
+          showToast('اپلیکیشن با موفقیت روی دستگاه شما نصب شد!');
+        }}
       />
     </div>
   );

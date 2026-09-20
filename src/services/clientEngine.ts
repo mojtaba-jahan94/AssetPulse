@@ -82,6 +82,17 @@ class ClientStorageService {
     localStorage.setItem(STORAGE_KEY_TXS, JSON.stringify(txs));
   }
 
+  public updateTransaction(tx: Transaction): void {
+    const txs = this.getTransactions();
+    const index = txs.findIndex((t) => t.id === tx.id);
+    if (index !== -1) {
+      txs[index] = tx;
+    } else {
+      txs.push(tx);
+    }
+    localStorage.setItem(STORAGE_KEY_TXS, JSON.stringify(txs));
+  }
+
   public deleteTransaction(id: string): void {
     const txs = this.getTransactions().filter((t) => t.id !== id);
     localStorage.setItem(STORAGE_KEY_TXS, JSON.stringify(txs));

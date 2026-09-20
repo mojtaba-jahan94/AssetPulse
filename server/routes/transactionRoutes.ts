@@ -60,5 +60,40 @@ export function createTransactionRouter(db: DatabaseService): Router {
     }
   });
 
+  // PUT /api/transactions/:id
+  router.put('/:id', (req: Request, res: Response) => {
+    try {
+      const id = req.params.id;
+      const body = req.body;
+
+      const existing = db.getTransactionById(id);
+      if (!existing) {
+        return res.status(404).json({ success: false, error: 'Transaction not found' });
+      }
+
+      const updatedTx: Transaction = {
+        id,
+        asset_id: body.asset_id || existing.asset_id,
+        type: body.type || existing.type,
+        quantity: body.quantity !== undefined ? parseFloat(body.quantity) : existing.quantity,
+        unit_price: body.unit_price !== undefined ? parseFloat(body.unit_price) : existing.unit_price,
+        currency: body.currency || existing.currency,
+        fee: body.fee !== undefined ? parseFloat(body.fee) : existing.fee,
+        fee_currency: body.fee_currency || body.currency || existing.fee_currency,
+        transaction_date: body.transaction_date || existing.transaction_date,
+        notes: body.notes !== undefined ? body.notes : existing.notes
+      };
+
+      const success = db.updateTransaction(updatedTx);
+      if (!success) {
+        return res.status(500).json({ success: false, error: 'Failed to update transaction in database' });
+      }
+
+      res.json({ success: true, data: updatedTx });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   return router;
 }

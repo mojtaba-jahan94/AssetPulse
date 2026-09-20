@@ -107,6 +107,7 @@ export async function createTransaction(tx: {
   notes?: string;
 }): Promise<Transaction> {
   const online = await checkServerOnline();
+  let createdTx: Transaction | null = null;
   if (online) {
     try {
       const res = await fetch(`${API_BASE}/transactions`, {
@@ -115,14 +116,15 @@ export async function createTransaction(tx: {
         body: JSON.stringify(tx)
       });
       const json = await res.json();
-      if (json.success) return json.data;
+      if (json.success) {
+        createdTx = json.data;
+      }
     } catch {
       isServerOnline = false;
     }
   }
 
-  // Client-side save
-  const newTx: Transaction = {
+  const resultTx: Transaction = createdTx || {
     id: `tx_c_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     asset_id: tx.asset_id,
     type: tx.type,
@@ -135,8 +137,54 @@ export async function createTransaction(tx: {
     notes: tx.notes || ''
   };
 
-  clientStorage.saveTransaction(newTx);
-  return newTx;
+  clientStorage.saveTransaction(resultTx);
+  return resultTx;
+}
+
+export async function updateTransaction(id: string, tx: {
+  asset_id: string;
+  type: 'buy' | 'sell';
+  quantity: number;
+  unit_price: number;
+  currency: 'toman' | 'usd';
+  fee?: number;
+  fee_currency?: 'toman' | 'usd';
+  transaction_date?: string;
+  notes?: string;
+}): Promise<Transaction> {
+  const online = await checkServerOnline();
+  let updatedTx: Transaction | null = null;
+  if (online) {
+    try {
+      const res = await fetch(`${API_BASE}/transactions/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tx)
+      });
+      const json = await res.json();
+      if (json.success) {
+        updatedTx = json.data;
+      }
+    } catch {
+      isServerOnline = false;
+    }
+  }
+
+  const finalTx: Transaction = updatedTx || {
+    id,
+    asset_id: tx.asset_id,
+    type: tx.type,
+    quantity: tx.quantity,
+    unit_price: tx.unit_price,
+    currency: tx.currency,
+    fee: tx.fee || 0,
+    fee_currency: tx.fee_currency || tx.currency,
+    transaction_date: tx.transaction_date || new Date().toISOString(),
+    notes: tx.notes || ''
+  };
+
+  clientStorage.updateTransaction(finalTx);
+  return finalTx;
 }
 
 export async function deleteTransaction(id: string): Promise<boolean> {
@@ -145,6 +193,7 @@ export async function deleteTransaction(id: string): Promise<boolean> {
     try {
       const res = await fetch(`${API_BASE}/transactions/${id}`, { method: 'DELETE' });
       const json = await res.json();
+      clientStorage.deleteTransaction(id);
       if (json.success) return true;
     } catch {
       isServerOnline = false;
