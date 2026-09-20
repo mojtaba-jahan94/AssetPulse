@@ -67,6 +67,79 @@ export async function fetchAssets(): Promise<Asset[]> {
   return clientStorage.getAssets();
 }
 
+export async function updateAsset(id: string, assetData: Partial<Asset>): Promise<Asset> {
+  const online = await checkServerOnline();
+  let updatedAsset: Asset | null = null;
+  if (online) {
+    try {
+      const res = await fetch(`${API_BASE}/portfolio/assets/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assetData)
+      });
+      const json = await res.json();
+      if (json.success) {
+        updatedAsset = json.data;
+      }
+    } catch {
+      isServerOnline = false;
+    }
+  }
+
+  if (!updatedAsset) {
+    const assets = clientStorage.getAssets();
+    const existing = assets.find((a) => a.id === id);
+    if (existing) {
+      updatedAsset = {
+        ...existing,
+        ...assetData,
+        id
+      } as Asset;
+    }
+  }
+
+  if (updatedAsset) {
+    clientStorage.updateAsset(updatedAsset);
+    return updatedAsset;
+  }
+  throw new Error('Asset not found');
+}
+
+export async function createAsset(assetData: Partial<Asset>): Promise<Asset> {
+  const online = await checkServerOnline();
+  let createdAsset: Asset | null = null;
+  if (online) {
+    try {
+      const res = await fetch(`${API_BASE}/portfolio/assets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assetData)
+      });
+      const json = await res.json();
+      if (json.success) {
+        createdAsset = json.data;
+      }
+    } catch {
+      isServerOnline = false;
+    }
+  }
+
+  const finalAsset: Asset = createdAsset || {
+    id: assetData.id || `custom_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    symbol: (assetData.symbol || 'CUSTOM').toUpperCase(),
+    name_en: assetData.name_en || assetData.symbol || 'Custom Asset',
+    name_fa: assetData.name_fa || 'دارایی سفارشی',
+    category: assetData.category || 'gold',
+    unit: assetData.unit || 'واحد',
+    decimals: assetData.decimals !== undefined ? assetData.decimals : 2,
+    icon: assetData.icon || 'Coins',
+    is_active: assetData.is_active !== undefined ? assetData.is_active : 1
+  };
+
+  clientStorage.saveAsset(finalAsset);
+  return finalAsset;
+}
+
 export async function fetchTransactions(): Promise<(Transaction & { symbol: string; name_en: string; name_fa: string; category: string })[]> {
   const online = await checkServerOnline();
   if (online) {

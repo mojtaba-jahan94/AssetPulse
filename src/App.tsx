@@ -5,9 +5,11 @@ import { BottomNav } from './components/layout/BottomNav';
 import { PriceTicker } from './components/layout/PriceTicker';
 import { NetWorthCard } from './components/dashboard/NetWorthCard';
 import { QuickStats } from './components/dashboard/QuickStats';
+import { DashboardPricePanel } from './components/dashboard/DashboardPricePanel';
 import { AllocationChart } from './components/dashboard/AllocationChart';
 import { PerformanceChart } from './components/dashboard/PerformanceChart';
 import { AssetList } from './components/assets/AssetList';
+import { EditAssetModal } from './components/assets/EditAssetModal';
 import { TransactionHistory, TxWithAsset } from './components/transactions/TransactionHistory';
 import { AddTransactionModal } from './components/transactions/AddTransactionModal';
 import { SettingsModal } from './components/settings/SettingsModal';
@@ -23,13 +25,15 @@ import {
   refreshPrices,
   createTransaction,
   updateTransaction,
-  deleteTransaction
+  deleteTransaction,
+  updateAsset,
+  createAsset
 } from './services/api';
 
 import { PortfolioSummary, CategoryAllocation, HistoricalPerformancePoint } from './types/portfolio';
 import { Asset, Transaction, LatestPrice } from './types/database';
 import { IngestionStatus } from './types/prices';
-import { Smartphone, Palette, Settings as SettingsIcon } from 'lucide-react';
+import { Smartphone, Palette, Settings as SettingsIcon, Plus } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabType>('dashboard');
@@ -44,13 +48,18 @@ export const App: React.FC = () => {
   const [performance, setPerformance] = useState<HistoricalPerformancePoint[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [transactions, setTransactions] = useState<TxWithAsset[]>([]);
-  const [latestPrices, setLatestPrices] = useState<(LatestPrice & { symbol: string; name_en: string; name_fa: string; category: string })[]>([]);
+  const [latestPrices, setLatestPrices] = useState<(LatestPrice & { symbol: string; name_en: string; name_fa: string; category: string; icon?: string })[]>([]);
   const [priceStatus, setPriceStatus] = useState<IngestionStatus | null>(null);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAddTxOpen, setIsAddTxOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<TxWithAsset | null>(null);
   const [preselectedAssetId, setPreselectedAssetId] = useState<string | undefined>(undefined);
+  
+  // Asset Editing state
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [isEditAssetOpen, setIsEditAssetOpen] = useState(false);
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -86,7 +95,14 @@ export const App: React.FC = () => {
       setPerformance(perfData);
       setAssets(assetsData);
       setTransactions(txData);
-      setLatestPrices(pricesData);
+      
+      // Merge asset icons into latestPrices
+      const assetMap = new Map<string, Asset>(assetsData.map((a) => [a.id, a]));
+      const enrichedPrices = pricesData.map((p) => ({
+        ...p,
+        icon: assetMap.get(p.asset_id)?.icon || 'Coins'
+      }));
+      setLatestPrices(enrichedPrices);
       setPriceStatus(statusData);
     } catch (err: any) {
       console.error('Failed to load initial data:', err);
@@ -165,6 +181,34 @@ export const App: React.FC = () => {
     setIsAddTxOpen(true);
   };
 
+  // Asset Editing Handlers
+  const handleOpenEditAsset = (asset: Asset) => {
+    setEditingAsset(asset);
+    setIsEditAssetOpen(true);
+  };
+
+  const handleOpenAddCustomAsset = () => {
+    setEditingAsset(null);
+    setIsEditAssetOpen(true);
+  };
+
+  const handleSaveAsset = async (assetData: Partial<Asset> & { id?: string }) => {
+    try {
+      if (assetData.id) {
+        await updateAsset(assetData.id, assetData);
+        showToast(`مشخصات دارایی «${assetData.name_fa}» با موفقیت به‌روز شد!`);
+      } else {
+        await createAsset(assetData);
+        showToast(`دارایی جدید «${assetData.name_fa}» با موفقیت ایجاد گردید!`);
+      }
+      setIsEditAssetOpen(false);
+      setEditingAsset(null);
+      await loadAllData();
+    } catch (err: any) {
+      showToast(err.message || 'خطا در ذخیره‌سازی دارایی', 'error');
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-dark-950 text-slate-100 selection:bg-amber-500 selection:text-dark-950 transition-colors duration-300">
       {/* Toast Notification */}
@@ -232,6 +276,14 @@ export const App: React.FC = () => {
                     privacyMode={privacyMode}
                   />
 
+                  {/* Customizable Live Market Watchlist & Price Panel */}
+                  <DashboardPricePanel
+                    prices={latestPrices}
+                    baseCurrency={baseCurrency}
+                    privacyMode={privacyMode}
+                    onAddTransactionForAsset={handleOpenAddForAsset}
+                  />
+
                   {/* Charts Grid */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <AllocationChart
@@ -265,6 +317,8 @@ export const App: React.FC = () => {
                       baseCurrency={baseCurrency}
                       privacyMode={privacyMode}
                       onAddTransactionForAsset={handleOpenAddForAsset}
+                      onEditAsset={handleOpenEditAsset}
+                      onAddNewAsset={handleOpenAddCustomAsset}
                     />
                   </div>
                 </div>
@@ -272,17 +326,30 @@ export const App: React.FC = () => {
 
               {currentTab === 'assets' && (
                 <div className="space-y-6 animate-in fade-in duration-300">
-                  <div>
-                    <h2 className="text-xl font-bold text-white">فهرست و ارزش‌گذاری دارایی‌ها</h2>
-                    <p className="text-xs text-slate-400 mt-1">
-                      موقعیت لحظه‌ای و سود و زیان تجمیعی در طلا، سکه، ارزهای جهانی و رمزارزها.
-                    </p>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-bold text-white">فهرست و مدیریت دارایی‌ها</h2>
+                      <p className="text-xs text-slate-400 mt-1">
+                        ویرایش مشخصات، نماد، اعشار، آیکون و ارزش‌گذاری موقعیت‌ها در طلا، ارز و رمزارز.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleOpenAddCustomAsset}
+                      className="self-start sm:self-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-dark-950 font-bold text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition-all inline-flex items-center space-x-1.5"
+                    >
+                      <Plus size={15} />
+                      <span>+ افزودن دارایی سفارشی</span>
+                    </button>
                   </div>
+
                   <AssetList
                     holdings={summary.holdings}
                     baseCurrency={baseCurrency}
                     privacyMode={privacyMode}
                     onAddTransactionForAsset={handleOpenAddForAsset}
+                    onEditAsset={handleOpenEditAsset}
+                    onAddNewAsset={handleOpenAddCustomAsset}
                   />
                 </div>
               )}
@@ -394,6 +461,17 @@ export const App: React.FC = () => {
         preselectedAssetId={preselectedAssetId}
         initialTransaction={editingTx}
         onSubmit={handleTransactionSubmit}
+      />
+
+      {/* Edit Asset Modal */}
+      <EditAssetModal
+        isOpen={isEditAssetOpen}
+        onClose={() => {
+          setIsEditAssetOpen(false);
+          setEditingAsset(null);
+        }}
+        asset={editingAsset}
+        onSave={handleSaveAsset}
       />
 
       {/* Settings & UI Customization Modal */}

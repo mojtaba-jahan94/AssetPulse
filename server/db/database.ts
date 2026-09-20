@@ -93,6 +93,26 @@ export class DatabaseService {
     );
   }
 
+  public updateAsset(asset: Asset): boolean {
+    const stmt = this.db.prepare(`
+      UPDATE assets
+      SET symbol = ?, name_en = ?, name_fa = ?, category = ?, unit = ?, decimals = ?, icon = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+    const res = stmt.run(
+      asset.symbol,
+      asset.name_en,
+      asset.name_fa,
+      asset.category,
+      asset.unit,
+      asset.decimals,
+      asset.icon,
+      asset.is_active ?? 1,
+      asset.id
+    );
+    return (res as any)?.changes > 0;
+  }
+
   // Transactions
   public getAllTransactions(): (Transaction & { symbol: string; name_en: string; name_fa: string; category: string })[] {
     const stmt = this.db.prepare(`

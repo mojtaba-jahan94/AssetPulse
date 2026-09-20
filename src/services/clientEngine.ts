@@ -67,6 +67,23 @@ class ClientStorageService {
     return JSON.parse(raw);
   }
 
+  public saveAsset(asset: Asset): void {
+    const assets = this.getAssets();
+    assets.push(asset);
+    localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(assets));
+  }
+
+  public updateAsset(asset: Asset): void {
+    const assets = this.getAssets();
+    const idx = assets.findIndex((a) => a.id === asset.id);
+    if (idx !== -1) {
+      assets[idx] = asset;
+    } else {
+      assets.push(asset);
+    }
+    localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(assets));
+  }
+
   public getTransactions(): Transaction[] {
     const raw = localStorage.getItem(STORAGE_KEY_TXS);
     if (!raw) {
